@@ -1,0 +1,4 @@
+@import "tailwindcss";
+
+html, body, #root { height: 100%; }
+.map-container { height: 480px; width: 100%; border-radius: 0.75rem; overflow: hidden; }

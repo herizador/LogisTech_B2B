@@ -1,0 +1,40 @@
+spring:
+  application:
+    name: logistech-backend
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/logistech}
+    username: ${DATABASE_USER:postgres}
+    password: ${DATABASE_PASSWORD:postgres}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          # Supabase JWT: se valida con el secret en SecurityConfig (modo simple para empezar)
+          issuer-uri: ${SUPABASE_URL:https://xyzcompany.supabase.co}
+
+server:
+  port: 8080
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+timefold:
+  solver:
+    termination:
+      spent-limit: 30s
+
+logging:
+  level:
+    com.logistech: DEBUG
