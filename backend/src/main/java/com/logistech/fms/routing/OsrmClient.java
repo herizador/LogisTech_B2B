@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
+import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
@@ -23,7 +24,10 @@ public class OsrmClient {
     SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
     factory.setConnectTimeout(Duration.ofSeconds(5));
     factory.setReadTimeout(Duration.ofSeconds(20));
-    this.rest = RestClient.builder().requestFactory(factory).build();
+    this.rest = RestClient.builder()
+        .requestFactory(factory)
+        .messageConverters(converters -> converters.add(new MappingJackson2HttpMessageConverter()))
+        .build();
     this.baseUrl = baseUrl;
   }
 
