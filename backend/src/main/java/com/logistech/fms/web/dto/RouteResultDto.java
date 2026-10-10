@@ -9,5 +9,6 @@ public record RouteResultDto(
     String driverName,
     BigDecimal totalKm,
     long drivingMinutes,
-    List<StopDto> stops) {
+    List<StopDto> stops,
+    List<List<Double>> geometry) {
 }

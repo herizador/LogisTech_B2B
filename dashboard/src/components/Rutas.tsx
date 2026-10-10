@@ -90,6 +90,7 @@ export default function Rutas() {
   const assignedCount = orders.filter((o) => o.status === 'assigned').length
   const base = { lat: numOr(depotLat, 41.648), lng: numOr(depotLng, -0.877), label: 'Base' }
   const lines = (result?.routes ?? []).map((r, i) => {
+    const color = ROUTE_COLORS[i % ROUTE_COLORS.length]
     const stops: MapPoint[] = []
     for (const s of r.stops) {
       const o = orderById.get(s.orderId)
@@ -97,7 +98,13 @@ export default function Rutas() {
         stops.push({ lat: o.lat, lng: o.lng, label: s.customerName, seq: s.seq })
       }
     }
-    return { color: ROUTE_COLORS[i % ROUTE_COLORS.length], points: [base, ...stops, base] }
+    if (r.geometry && r.geometry.length > 1) {
+      // Recorrido real por carretera (OSRM)
+      const road = r.geometry.map(([lng, lat]) => ({ lat, lng, label: '' }))
+      return { color, points: road, markers: [base, ...stops] }
+    }
+    // Reserva: línea recta
+    return { color, points: [base, ...stops, base] }
   })
 
   const input = 'border rounded px-2 py-1 text-sm w-full'

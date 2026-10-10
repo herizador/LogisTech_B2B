@@ -11,6 +11,7 @@ export interface MapPoint {
 export interface RouteLine {
   points: MapPoint[]
   color: string
+  markers?: MapPoint[]
 }
 
 const STYLE = 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json'
@@ -70,9 +71,12 @@ export default function MapView({ points, routes = [] }: { points: MapPoint[]; r
         })
       })
       routes.forEach((r) => {
-        r.points.forEach((p) => {
-          if (p.seq == null) return
-          markers.push(new Marker({ element: numberedEl(p.seq, r.color) }).setLngLat([p.lng, p.lat]).addTo(map))
+        (r.markers ?? r.points.filter((p) => p.seq != null)).forEach((p) => {
+          if (p.seq == null) {
+            markers.push(new Marker().setLngLat([p.lng, p.lat]).addTo(map))
+          } else {
+            markers.push(new Marker({ element: numberedEl(p.seq, r.color) }).setLngLat([p.lng, p.lat]).addTo(map))
+          }
         })
       })
       points.forEach((p) => {

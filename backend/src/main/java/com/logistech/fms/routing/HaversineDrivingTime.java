@@ -13,6 +13,13 @@ public final class HaversineDrivingTime {
     if (from == to) {
       return 0L;
     }
+    return metersToDrivingSeconds(meters(from, to));
+  }
+
+  public static double meters(RoutingLocation from, RoutingLocation to) {
+    if (from == to) {
+      return 0.0;
+    }
     double lat1 = Math.toRadians(from.getLatitude());
     double lon1 = Math.toRadians(from.getLongitude());
     double lat2 = Math.toRadians(to.getLatitude());
@@ -22,7 +29,11 @@ public final class HaversineDrivingTime {
     double a = Math.sin(dLat / 2) * Math.sin(dLat / 2)
         + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
     long meters = Math.round(2 * EARTH_RADIUS_IN_M * Math.asin(Math.sqrt(a)));
-    return Math.round((double) meters / AVERAGE_SPEED_KMPH * 3.6);
+    return (double) meters;
+  }
+
+  private static long metersToDrivingSeconds(double meters) {
+    return Math.round(meters / AVERAGE_SPEED_KMPH * 3.6);
   }
 
   /** Km estimados a partir de segundos de conducción (misma hipótesis de 50 km/h). */

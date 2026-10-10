@@ -2,8 +2,7 @@ package com.logistech.fms.routing;
 
 import ai.timefold.solver.core.api.solver.SolverJob;
 import ai.timefold.solver.core.api.solver.SolverManager;
-import com.logistech.fms.domain.Company;
-import com.logistech.fms.domain.CustomerOrder;
+import com.logistech.fms.domain.Company;import com.logistech.fms.domain.CustomerOrder;
 import com.logistech.fms.domain.DeliveryRoute;
 import com.logistech.fms.domain.Driver;
 import com.logistech.fms.domain.RouteStop;
@@ -29,6 +28,8 @@ import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -37,6 +38,7 @@ import org.springframework.web.server.ResponseStatusException;
 @Service
 public class RouteOptimizationService {
 
+  private static final Logger log = LoggerFactory.getLogger(RouteOptimizationService.class);
   private static final Duration SERVICE_DURATION = Duration.ofMinutes(5);
   private static final int DEFAULT_CAPACITY_KG = 1000;
 
@@ -46,16 +48,18 @@ public class RouteOptimizationService {
   private final DeliveryRouteRepository routes;
   private final RouteStopRepository stops;
   private final SolverManager<DeliveryRoutePlan> solverManager;
+  private final OsrmClient osrm;
 
   public RouteOptimizationService(CompanyRepository companies, DriverRepository drivers,
       CustomerOrderRepository orders, DeliveryRouteRepository routes, RouteStopRepository stops,
-      SolverManager<DeliveryRoutePlan> solverManager) {
+      SolverManager<DeliveryRoutePlan> solverManager, OsrmClient osrm) {
     this.companies = companies;
     this.drivers = drivers;
     this.orders = orders;
     this.routes = routes;
     this.stops = stops;
     this.solverManager = solverManager;
+    this.osrm = osrm;
   }
 
   @Transactional
@@ -91,7 +95,7 @@ public class RouteOptimizationService {
     List<RoutingLocation> allLocations = new ArrayList<>();
     allLocations.add(depot);
     visits.forEach(v -> allLocations.add(v.getLocation()));
-    RoutingLocation.initDrivingTimeMaps(allLocations);
+    loadRoadMatrices(allLocations);
 
     DeliveryRoutePlan problem = new DeliveryRoutePlan("rutas-" + date, vehicles, visits);
     DeliveryRoutePlan solved = solve(problem);
@@ -111,9 +115,15 @@ public class RouteOptimizationService {
       route.setDriver(driver);
       route.setDate(date);
       long drivingSeconds = vehicle.getTotalDrivingTimeSeconds();
-      route.setTotalKm(BigDecimal.valueOf(HaversineDrivingTime.secondsToKm(drivingSeconds))
+      route.setTotalKm(BigDecimal.valueOf(vehicle.getTotalDistanceMeters() / 1000.0)
           .setScale(2, RoundingMode.HALF_UP));
       routes.save(route);
+
+      List<RoutingLocation> ordered = new ArrayList<>();
+      ordered.add(depot);
+      vehicle.getVisits().forEach(v -> ordered.add(v.getLocation()));
+      ordered.add(depot);
+      List<List<Double>> geometry = loadGeometry(ordered);
 
       List<StopDto> stopDtos = new ArrayList<>();
       int seq = 1;
@@ -138,7 +148,7 @@ public class RouteOptimizationService {
       }
       routeDtos.add(new RouteResultDto(route.getId(),
           driver == null ? "Sin asignar" : driver.getFullName(),
-          route.getTotalKm(), drivingSeconds / 60, stopDtos));
+          route.getTotalKm(), drivingSeconds / 60, stopDtos, geometry));
     }
 
     double totalKm = routeDtos.stream().mapToDouble(r -> r.totalKm().doubleValue()).sum();
@@ -170,8 +180,28 @@ public class RouteOptimizationService {
         minStart, maxEnd, SERVICE_DURATION);
   }
 
-  private DeliveryRoutePlan solve(DeliveryRoutePlan problem) {
+  private void loadRoadMatrices(List<RoutingLocation> allLocations) {
     try {
+      OsrmClient.Matrices matrices = osrm.table(allLocations);
+      RoutingLocation.initFromMatrices(allLocations,
+          matrices.durationsSeconds(), matrices.distancesMeters());
+      log.info("Matriz OSRM cargada para {} ubicaciones", allLocations.size());
+    } catch (Exception e) {
+      log.warn("OSRM no disponible, usando Haversine: {}", e.getMessage());
+      RoutingLocation.initHaversine(allLocations);
+    }
+  }
+
+  private List<List<Double>> loadGeometry(List<RoutingLocation> ordered) {
+    try {
+      return osrm.routeGeometry(ordered);
+    } catch (Exception e) {
+      log.warn("Sin geometría OSRM, línea recta: {}", e.getMessage());
+      return null;
+    }
+  }
+
+  private DeliveryRoutePlan solve(DeliveryRoutePlan problem) {    try {
       SolverJob<DeliveryRoutePlan> job = solverManager.solve(UUID.randomUUID(), problem);
       return job.getFinalBestSolution();
     } catch (InterruptedException e) {

@@ -43,6 +43,7 @@ export interface RouteDto {
   totalKm: number
   drivingMinutes: number
   stops: RouteStopDto[]
+  geometry: number[][] | null
 }
 
 export interface SkippedDto {

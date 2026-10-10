@@ -1,14 +1,16 @@
 package com.logistech.fms.routing;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
-/** Punto geográfico con matriz de tiempos de conducción precalculada (Haversine, 50 km/h). */
+/** Punto geográfico con matrices de tiempo y distancia precalculadas. */
 public class RoutingLocation {
 
   private double latitude;
   private double longitude;
   private Map<RoutingLocation, Long> drivingTimeSeconds;
+  private Map<RoutingLocation, Double> distanceMeters;
 
   public RoutingLocation() {
   }
@@ -30,17 +32,44 @@ public class RoutingLocation {
     this.drivingTimeSeconds = drivingTimeSeconds;
   }
 
+  public void setDistanceMeters(Map<RoutingLocation, Double> distanceMeters) {
+    this.distanceMeters = distanceMeters;
+  }
+
   public long getDrivingTimeTo(RoutingLocation other) {
     return drivingTimeSeconds.get(other);
   }
 
-  public static void initDrivingTimeMaps(java.util.List<RoutingLocation> locations) {
+  public double getDistanceTo(RoutingLocation other) {
+    return distanceMeters.get(other);
+  }
+
+  /** Rellena ambas matrices con Haversine (reserva si OSRM falla). */
+  public static void initHaversine(List<RoutingLocation> locations) {
     for (RoutingLocation from : locations) {
-      Map<RoutingLocation, Long> map = new HashMap<>();
+      Map<RoutingLocation, Long> times = new HashMap<>();
+      Map<RoutingLocation, Double> distances = new HashMap<>();
       for (RoutingLocation to : locations) {
-        map.put(to, HaversineDrivingTime.calculate(from, to));
+        times.put(to, HaversineDrivingTime.calculate(from, to));
+        distances.put(to, HaversineDrivingTime.meters(from, to));
       }
-      from.setDrivingTimeSeconds(map);
+      from.setDrivingTimeSeconds(times);
+      from.setDistanceMeters(distances);
+    }
+  }
+
+  /** Rellena ambas matrices con datos reales de OSRM. */
+  public static void initFromMatrices(List<RoutingLocation> locations,
+      long[][] durationsSeconds, double[][] distancesMeters) {
+    for (int i = 0; i < locations.size(); i++) {
+      Map<RoutingLocation, Long> times = new HashMap<>();
+      Map<RoutingLocation, Double> distances = new HashMap<>();
+      for (int j = 0; j < locations.size(); j++) {
+        times.put(locations.get(j), durationsSeconds[i][j]);
+        distances.put(locations.get(j), distancesMeters[i][j]);
+      }
+      locations.get(i).setDrivingTimeSeconds(times);
+      locations.get(i).setDistanceMeters(distances);
     }
   }
 

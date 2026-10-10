@@ -91,6 +91,20 @@ public class DeliveryVehicle {
     return total;
   }
 
+  public double getTotalDistanceMeters() {
+    if (visits.isEmpty()) {
+      return 0;
+    }
+    double total = 0;
+    RoutingLocation previous = homeLocation;
+    for (DeliveryVisit visit : visits) {
+      total += previous.getDistanceTo(visit.getLocation());
+      previous = visit.getLocation();
+    }
+    total += previous.getDistanceTo(homeLocation);
+    return total;
+  }
+
   @Override
   public String toString() {
     return id;

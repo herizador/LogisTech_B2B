@@ -35,6 +35,10 @@ timefold:
     termination:
       spent-limit: 30s
 
+app:
+  osrm:
+    base-url: ${OSRM_BASE_URL:https://router.project-osrm.org}
+
 logging:
   level:
     com.logistech: DEBUG
