@@ -23,7 +23,7 @@ spring:
           issuer-uri: ${SUPABASE_URL:https://xyzcompany.supabase.co}
 
 server:
-  port: 8080
+  port: ${PORT:8080}
 
 management:
   endpoints:
