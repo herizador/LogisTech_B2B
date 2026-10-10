@@ -1,5 +1,7 @@
 const API = (import.meta.env.VITE_API_URL as string | undefined) ?? 'http://localhost:8080'
 
+export const API_BASE = API
+
 export interface Company {
   id: string
   name: string
@@ -26,3 +28,24 @@ async function get<T>(path: string): Promise<T> {
 
 export const getCompanies = () => get<Company[]>('/api/companies')
 export const getOrders = (companyId: string) => get<Order[]>(`/api/companies/${companyId}/orders`)
+
+export interface NewOrder {
+  customerName: string
+  address: string
+  lat?: number
+  lng?: number
+  weightKg?: number
+}
+
+export async function createOrder(companyId: string, body: NewOrder): Promise<Order> {
+  const res = await fetch(`${API}/api/companies/${companyId}/orders`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  if (!res.ok) {
+    const text = await res.text()
+    throw new Error(`${res.status} ${text || res.statusText} en POST /api/companies/${companyId}/orders`)
+  }
+  return res.json() as Promise<Order>
+}

@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { Routes, Route, Link } from 'react-router-dom'
 import MapView from './components/MapView'
-import { getCompanies, getOrders, type Company, type Order } from './lib/api'
+import OrderForm from './components/OrderForm'
+import { API_BASE, getCompanies, getOrders, type Company, type Order } from './lib/api'
 
 function Layout({ children }: { children: React.ReactNode }) {
   return (
@@ -34,14 +35,18 @@ function Dashboard() {
         setLoading(false)
       })
       .catch((e) => {
-        setError(`No se pudo contactar con la API: ${e.message}`)
+        setError(`No se pudo contactar con la API (${API_BASE}): ${e.message}`)
         setLoading(false)
       })
   }, [])
 
+  function loadOrders(id: string) {
+    getOrders(id).then(setOrders).catch((e) => setError(`Error cargando pedidos: ${e.message}`))
+  }
+
   useEffect(() => {
     if (!companyId) return
-    getOrders(companyId).then(setOrders).catch((e) => setError(`Error cargando pedidos: ${e.message}`))
+    loadOrders(companyId)
   }, [companyId])
 
   const points = orders
@@ -80,6 +85,7 @@ function Dashboard() {
             </li>
           ))}
         </ul>
+        {companyId && <OrderForm companyId={companyId} onCreated={() => loadOrders(companyId)} />}
       </div>
     </div>
   )
