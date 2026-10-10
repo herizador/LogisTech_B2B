@@ -18,9 +18,9 @@ export default function OrderForm({ companyId, onCreated }: { companyId: string;
       await createOrder(companyId, {
         customerName,
         address,
-        lat: lat === '' ? undefined : Number(lat),
-        lng: lng === '' ? undefined : Number(lng),
-        weightKg: weightKg === '' ? undefined : Number(weightKg),
+        lat: parseCoord(lat, 'Lat', -90, 90),
+        lng: parseCoord(lng, 'Lng', -180, 180),
+        weightKg: weightKg.trim() === '' ? undefined : Number(weightKg.trim().replace(',', '.')),
       })
       setCustomerName('')
       setAddress('')
@@ -33,6 +33,15 @@ export default function OrderForm({ companyId, onCreated }: { companyId: string;
   }
 
   const input = 'border rounded px-2 py-1 text-sm w-full'
+
+  function parseCoord(raw: string, name: string, min: number, max: number): number | undefined {
+    const t = raw.trim().replace(',', '.')
+    if (t === '') return undefined
+    const n = Number(t)
+    if (!Number.isFinite(n)) throw new Error(`${name}: "${raw}" no es un número (ej. 41.648)`)
+    if (n < min || n > max) throw new Error(`${name} debe estar entre ${min} y ${max}`)
+    return n
+  }
 
   return (
     <form onSubmit={submit} className="space-y-2 mt-4 border-t pt-3">

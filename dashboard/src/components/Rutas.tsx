@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { getCompanies, optimizeRoutes, type Company, type OptimizeResult } from '../lib/api'
+import MapView, { ROUTE_COLORS, type MapPoint } from './MapView'
+import { getCompanies, getOrders, optimizeRoutes, type Company, type Order, type OptimizeResult } from '../lib/api'
 
 function todayISO() {
   return new Date().toISOString().slice(0, 10)
@@ -10,9 +11,15 @@ function formatETA(iso: string | null) {
   return new Date(iso).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })
 }
 
+function numOr(raw: string, fallback: number): number {
+  const n = Number(raw.trim().replace(',', '.'))
+  return Number.isFinite(n) ? n : fallback
+}
+
 export default function Rutas() {
   const [companies, setCompanies] = useState<Company[]>([])
   const [companyId, setCompanyId] = useState('')
+  const [orders, setOrders] = useState<Order[]>([])
   const [date, setDate] = useState(todayISO())
   const [depotLat, setDepotLat] = useState('41.648')
   const [depotLng, setDepotLng] = useState('-0.877')
@@ -29,6 +36,11 @@ export default function Rutas() {
       .catch((e) => setError(`No se pudo contactar con la API: ${e.message}`))
   }, [])
 
+  useEffect(() => {
+    if (!companyId) return
+    getOrders(companyId).then(setOrders).catch(() => undefined)
+  }, [companyId])
+
   async function run(e: React.FormEvent) {
     e.preventDefault()
     setLoading(true)
@@ -41,12 +53,26 @@ export default function Rutas() {
         depotLng: depotLng === '' ? undefined : Number(depotLng),
       })
       setResult(r)
+      getOrders(companyId).then(setOrders).catch(() => undefined)
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
     } finally {
       setLoading(false)
     }
   }
+
+  const orderById = new Map(orders.map((o) => [o.id, o]))
+  const base = { lat: numOr(depotLat, 41.648), lng: numOr(depotLng, -0.877), label: 'Base' }
+  const lines = (result?.routes ?? []).map((r, i) => {
+    const stops: MapPoint[] = []
+    for (const s of r.stops) {
+      const o = orderById.get(s.orderId)
+      if (o && o.lat != null && o.lng != null) {
+        stops.push({ lat: o.lat, lng: o.lng, label: s.customerName, seq: s.seq })
+      }
+    }
+    return { color: ROUTE_COLORS[i % ROUTE_COLORS.length], points: [base, ...stops, base] }
+  })
 
   const input = 'border rounded px-2 py-1 text-sm w-full'
 
@@ -81,40 +107,49 @@ export default function Rutas() {
         <p className="text-xs text-slate-400">Optimiza pedidos pendientes con coordenadas. Respeta capacidad y ventanas horarias.</p>
       </form>
 
-      <div className="lg:col-span-2 bg-white rounded-xl shadow p-4">
-        <h2 className="font-semibold mb-2">Resultado</h2>
-        {!result && !loading && <p className="text-sm text-slate-500">Sin resultado todavía.</p>}
-        {loading && <p className="text-sm">Resolviendo VRP con Timefold…</p>}
-        {result && (
-          <div className="space-y-4 text-sm">
-            <p>
-              <strong>{result.date}</strong> · {result.totalKm.toFixed(1)} km · {result.totalDrivingMinutes} min
-              · {result.routes.length} ruta(s)
-            </p>
-            {result.routes.map((r) => (
-              <div key={r.routeId} className="border rounded p-3">
-                <p className="font-medium">{r.driverName} · {r.totalKm.toFixed(1)} km · {r.drivingMinutes} min</p>
-                <ol className="list-decimal ml-5 mt-1 space-y-1">
-                  {r.stops.map((s) => (
-                    <li key={s.orderId}>
-                      {s.customerName} — {s.address} <span className="text-slate-400">ETA {formatETA(s.eta)}</span>
-                    </li>
-                  ))}
-                </ol>
-              </div>
-            ))}
-            {result.skipped.length > 0 && (
-              <div className="border border-amber-300 bg-amber-50 rounded p-3">
-                <p className="font-medium">Omitidos ({result.skipped.length})</p>
-                <ul className="list-disc ml-5">
-                  {result.skipped.map((s) => (
-                    <li key={s.orderId}>{s.customerName} — {s.reason}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </div>
-        )}
+      <div className="lg:col-span-2 space-y-6">
+        {result && <MapView points={[]} routes={lines} />}
+        <div className="bg-white rounded-xl shadow p-4">
+          <h2 className="font-semibold mb-2">Resultado</h2>
+          {!result && !loading && <p className="text-sm text-slate-500">Sin resultado todavía.</p>}
+          {loading && <p className="text-sm">Resolviendo VRP con Timefold…</p>}
+          {result && (
+            <div className="space-y-4 text-sm">
+              <p>
+                <strong>{result.date}</strong> · {result.totalKm.toFixed(1)} km · {result.totalDrivingMinutes} min
+                · {result.routes.length} ruta(s)
+              </p>
+              {result.routes.map((r, i) => (
+                <div key={r.routeId} className="border rounded p-3">
+                  <p className="font-medium">
+                    <span
+                      className="inline-block w-3 h-3 rounded-full mr-1"
+                      style={{ background: ROUTE_COLORS[i % ROUTE_COLORS.length] }}
+                    />
+                    {r.driverName} · {r.totalKm.toFixed(1)} km · {r.drivingMinutes} min
+                  </p>
+                  <ol className="list-decimal ml-5 mt-1 space-y-1">
+                    {r.stops.map((s) => (
+                      <li key={s.orderId}>
+                        {s.customerName} — {s.address} <span className="text-slate-400">ETA {formatETA(s.eta)}</span>
+                      </li>
+                    ))}
+                  </ol>
+                </div>
+              ))}
+              {result.skipped.length > 0 && (
+                <div className="border border-amber-300 bg-amber-50 rounded p-3">
+                  <p className="font-medium">Omitidos ({result.skipped.length})</p>
+                  <ul className="list-disc ml-5">
+                    {result.skipped.map((s) => (
+                      <li key={s.orderId}>{s.customerName} — {s.reason}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   )

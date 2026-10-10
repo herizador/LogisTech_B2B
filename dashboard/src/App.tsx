@@ -82,6 +82,11 @@ function Dashboard() {
             <li key={o.id} className="border rounded p-2">
               <p className="font-medium">{o.customerName}</p>
               <p className="text-slate-500">{o.address}</p>
+              <p className="text-xs text-slate-400">
+                {o.lat != null && o.lng != null
+                  ? `${o.lat.toFixed(5)}, ${o.lng.toFixed(5)}`
+                  : 'sin coordenadas'}
+              </p>
               <p className="text-xs text-slate-400">{o.status}{o.weightKg != null ? ` · ${o.weightKg} kg` : ''}</p>
             </li>
           ))}
