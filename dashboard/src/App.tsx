@@ -1,5 +1,7 @@
+import { useEffect, useState } from 'react'
 import { Routes, Route, Link } from 'react-router-dom'
 import MapView from './components/MapView'
+import { getCompanies, getOrders, type Company, type Order } from './lib/api'
 
 function Layout({ children }: { children: React.ReactNode }) {
   return (
@@ -18,20 +20,66 @@ function Layout({ children }: { children: React.ReactNode }) {
 }
 
 function Dashboard() {
+  const [companies, setCompanies] = useState<Company[]>([])
+  const [companyId, setCompanyId] = useState('')
+  const [orders, setOrders] = useState<Order[]>([])
+  const [error, setError] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    getCompanies()
+      .then((cs) => {
+        setCompanies(cs)
+        if (cs.length > 0) setCompanyId(cs[0].id)
+        setLoading(false)
+      })
+      .catch((e) => {
+        setError(`No se pudo contactar con la API: ${e.message}`)
+        setLoading(false)
+      })
+  }, [])
+
+  useEffect(() => {
+    if (!companyId) return
+    getOrders(companyId).then(setOrders).catch((e) => setError(`Error cargando pedidos: ${e.message}`))
+  }, [companyId])
+
+  const points = orders
+    .filter((o) => o.lat != null && o.lng != null)
+    .map((o) => ({ lat: o.lat!, lng: o.lng!, label: o.customerName }))
+
   return (
     <div className="grid gap-6 lg:grid-cols-3">
       <div className="lg:col-span-2 bg-white rounded-xl shadow p-4">
-        <h2 className="font-semibold mb-2">Flota en tiempo real (MapLibre + OSM)</h2>
-        <MapView />
+        <div className="flex items-center justify-between mb-2">
+          <h2 className="font-semibold">Pedidos en mapa ({points.length})</h2>
+          <select
+            className="border rounded px-2 py-1 text-sm"
+            value={companyId}
+            onChange={(e) => setCompanyId(e.target.value)}
+          >
+            {companies.map((c) => (
+              <option key={c.id} value={c.id}>{c.name}</option>
+            ))}
+          </select>
+        </div>
+        {error && <p className="text-sm text-red-600 mb-2">{error}</p>}
+        {loading ? <p className="text-sm">Cargando…</p> : <MapView points={points} />}
       </div>
       <div className="bg-white rounded-xl shadow p-4">
-        <h2 className="font-semibold mb-2">Próximos pasos</h2>
-        <ol className="list-decimal ml-5 text-sm space-y-1">
-          <li>Crear proyecto en Supabase y copiar URL + anon key a .env</li>
-          <li>Ejecutar <code>docs/02-modelo-datos.sql</code> en Supabase SQL Editor</li>
-          <li>Arrancar backend: <code>cd backend; ./mvnw spring-boot:run</code></li>
-          <li>Probar <code>GET http://localhost:8080/api/health</code></li>
-        </ol>
+        <h2 className="font-semibold mb-2">Pedidos ({orders.length})</h2>
+        {orders.length === 0 && !loading && (
+          <p className="text-sm text-slate-500">Sin pedidos. Crea uno con POST /api/companies/{companyId}/orders</p>
+        )}
+        <ul className="space-y-2 text-sm">
+          {orders.map((o) => (
+            <li key={o.id} className="border rounded p-2">
+              <p className="font-medium">{o.customerName}</p>
+              <p className="text-slate-500">{o.address}</p>
+              <p className="text-xs text-slate-400">{o.status}{o.weightKg != null ? ` · ${o.weightKg} kg` : ''}</p>
+            </li>
+          ))}
+        </ul>
       </div>
     </div>
   )
@@ -42,7 +90,7 @@ function Rutas() {
 }
 
 function Health() {
-  return <p className="text-sm">Backend health: http://localhost:8080/api/health</p>
+  return <p className="text-sm">Backend health: {(import.meta.env.VITE_API_URL as string) ?? 'http://localhost:8080'}/api/health</p>
 }
 
 export default function App() {
