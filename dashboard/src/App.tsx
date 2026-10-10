@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Routes, Route, Link } from 'react-router-dom'
 import MapView from './components/MapView'
 import OrderForm from './components/OrderForm'
+import Rutas from './components/Rutas'
 import { API_BASE, getCompanies, getOrders, type Company, type Order } from './lib/api'
 
 function Layout({ children }: { children: React.ReactNode }) {
@@ -89,10 +90,6 @@ function Dashboard() {
       </div>
     </div>
   )
-}
-
-function Rutas() {
-  return <p className="text-sm">Aquí irá el optimizador VRP (Timefold + OSRM). Pendiente de backend.</p>
 }
 
 function Health() {

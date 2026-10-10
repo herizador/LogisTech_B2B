@@ -29,6 +29,52 @@ async function get<T>(path: string): Promise<T> {
 export const getCompanies = () => get<Company[]>('/api/companies')
 export const getOrders = (companyId: string) => get<Order[]>(`/api/companies/${companyId}/orders`)
 
+export interface RouteStopDto {
+  seq: number
+  orderId: string
+  customerName: string
+  address: string
+  eta: string | null
+}
+
+export interface RouteDto {
+  routeId: string
+  driverName: string
+  totalKm: number
+  drivingMinutes: number
+  stops: RouteStopDto[]
+}
+
+export interface SkippedDto {
+  orderId: string
+  customerName: string
+  reason: string
+}
+
+export interface OptimizeResult {
+  date: string
+  totalKm: number
+  totalDrivingMinutes: number
+  routes: RouteDto[]
+  skipped: SkippedDto[]
+}
+
+export async function optimizeRoutes(
+  companyId: string,
+  body: { date?: string; depotLat?: number; depotLng?: number },
+): Promise<OptimizeResult> {
+  const res = await fetch(`${API}/api/companies/${companyId}/routes/optimize`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  if (!res.ok) {
+    const text = await res.text()
+    throw new Error(`${res.status} ${text || res.statusText}`)
+  }
+  return res.json() as Promise<OptimizeResult>
+}
+
 export interface NewOrder {
   customerName: string
   address: string

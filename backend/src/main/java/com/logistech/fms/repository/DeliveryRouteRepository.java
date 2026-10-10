@@ -9,4 +9,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 public interface DeliveryRouteRepository extends JpaRepository<DeliveryRoute, UUID> {
 
   List<DeliveryRoute> findByCompanyIdAndDate(UUID companyId, LocalDate date);
+
+  List<DeliveryRoute> findByCompanyIdOrderByDateDesc(UUID companyId);
 }
