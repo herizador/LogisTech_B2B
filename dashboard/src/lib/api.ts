@@ -59,8 +59,27 @@ export interface OptimizeResult {
   skipped: SkippedDto[]
 }
 
-export async function optimizeRoutes(
-  companyId: string,
+export interface ResetDayResult {
+  date: string
+  routesDeleted: number
+  stopsDeleted: number
+  ordersReset: number
+}
+
+export async function resetDay(companyId: string, date?: string): Promise<ResetDayResult> {
+  const res = await fetch(`${API}/api/companies/${companyId}/routes/reset`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ date }),
+  })
+  if (!res.ok) {
+    const text = await res.text()
+    throw new Error(`${res.status} ${text || res.statusText}`)
+  }
+  return res.json() as Promise<ResetDayResult>
+}
+
+export async function optimizeRoutes(  companyId: string,
   body: { date?: string; depotLat?: number; depotLng?: number },
 ): Promise<OptimizeResult> {
   const res = await fetch(`${API}/api/companies/${companyId}/routes/optimize`, {

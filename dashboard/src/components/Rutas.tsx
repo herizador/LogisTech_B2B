@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import MapView, { ROUTE_COLORS, type MapPoint } from './MapView'
-import { getCompanies, getOrders, optimizeRoutes, type Company, type Order, type OptimizeResult } from '../lib/api'
+import { getCompanies, getOrders, optimizeRoutes, resetDay, type Company, type Order, type OptimizeResult } from '../lib/api'
 
 function todayISO() {
   return new Date().toISOString().slice(0, 10)
@@ -25,7 +25,9 @@ export default function Rutas() {
   const [depotLng, setDepotLng] = useState('-0.877')
   const [result, setResult] = useState<OptimizeResult | null>(null)
   const [loading, setLoading] = useState(false)
+  const [resetting, setResetting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [info, setInfo] = useState<string | null>(null)
 
   useEffect(() => {
     getCompanies()
@@ -45,6 +47,7 @@ export default function Rutas() {
     e.preventDefault()
     setLoading(true)
     setError(null)
+    setInfo(null)
     setResult(null)
     try {
       const r = await optimizeRoutes(companyId, {
@@ -61,7 +64,30 @@ export default function Rutas() {
     }
   }
 
+  async function reset(e: React.FormEvent) {
+    e.preventDefault()
+    setResetting(true)
+    setError(null)
+    setInfo(null)
+    setResult(null)
+    try {
+      const r = await resetDay(companyId, date)
+      setInfo(`Día ${r.date} reiniciado: ${r.routesDeleted} ruta(s) borradas, ${r.ordersReset} pedido(s) a pendiente.`)
+      getOrders(companyId).then(setOrders).catch(() => undefined)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setResetting(false)
+    }
+  }
+
   const orderById = new Map(orders.map((o) => [o.id, o]))
+  const background: MapPoint[] = orders
+    .filter((o) => o.lat != null && o.lng != null)
+    .map((o) => ({ lat: o.lat!, lng: o.lng!, label: o.customerName }))
+  const pendingCount = orders.filter((o) => o.status === 'pending').length
+  const pendingNoCoords = orders.filter((o) => o.status === 'pending' && (o.lat == null || o.lng == null)).length
+  const assignedCount = orders.filter((o) => o.status === 'assigned').length
   const base = { lat: numOr(depotLat, 41.648), lng: numOr(depotLng, -0.877), label: 'Base' }
   const lines = (result?.routes ?? []).map((r, i) => {
     const stops: MapPoint[] = []
@@ -97,22 +123,47 @@ export default function Rutas() {
           </label>
         </div>
         {error && <p className="text-xs text-red-600">{error}</p>}
-        <button
-          type="submit"
-          disabled={loading || !companyId}
-          className="bg-slate-900 text-white text-sm rounded px-3 py-1.5 disabled:opacity-50"
-        >
-          {loading ? 'Optimizando… (hasta ~40s)' : 'Optimizar'}
-        </button>
+        {info && <p className="text-xs text-green-700">{info}</p>}
+        <div className="flex gap-2">
+          <button
+            type="submit"
+            disabled={loading || resetting || !companyId}
+            className="bg-slate-900 text-white text-sm rounded px-3 py-1.5 disabled:opacity-50"
+          >
+            {loading ? 'Optimizando… (hasta ~40s)' : 'Optimizar'}
+          </button>
+          <button
+            type="button"
+            onClick={reset}
+            disabled={loading || resetting || !companyId}
+            className="border text-sm rounded px-3 py-1.5 disabled:opacity-50"
+            title="Borra las rutas del día y devuelve los pedidos a pendiente"
+          >
+            {resetting ? 'Reiniciando…' : 'Reiniciar día'}
+          </button>
+        </div>
         <p className="text-xs text-slate-400">Optimiza pedidos pendientes con coordenadas. Respeta capacidad y ventanas horarias.</p>
       </form>
 
       <div className="lg:col-span-2 space-y-6">
-        {result && <MapView points={[]} routes={lines} />}
+        <MapView points={background} routes={lines} />
         <div className="bg-white rounded-xl shadow p-4">
           <h2 className="font-semibold mb-2">Resultado</h2>
-          {!result && !loading && <p className="text-sm text-slate-500">Sin resultado todavía.</p>}
+          {!result && !loading && (
+            <p className="text-sm text-slate-500">
+              Sin resultado todavía. Hay {pendingCount} pendiente(s)
+              {pendingNoCoords > 0 && ` (${pendingNoCoords} sin coordenadas)`}
+              {assignedCount > 0 && ` y ${assignedCount} ya asignado(s)`}.
+            </p>
+          )}
           {loading && <p className="text-sm">Resolviendo VRP con Timefold…</p>}
+          {result && result.routes.length === 0 && result.skipped.length === 0 && (
+            <p className="text-sm text-slate-500">
+              Nada que optimizar: no hay pedidos pendientes con coordenadas. Hay {assignedCount} asignado(s)
+              {pendingNoCoords > 0 && ` y ${pendingNoCoords} pendiente(s) sin coordenadas`}. Usa «Reiniciar día» para
+              volver a optimizar tras corregir datos.
+            </p>
+          )}
           {result && (
             <div className="space-y-4 text-sm">
               <p>

@@ -2,6 +2,7 @@ package com.logistech.fms.web;
 
 import com.logistech.fms.domain.DeliveryRoute;
 import com.logistech.fms.repository.CompanyRepository;
+import com.logistech.fms.repository.CustomerOrderRepository;
 import com.logistech.fms.repository.DeliveryRouteRepository;
 import com.logistech.fms.repository.RouteStopRepository;
 import com.logistech.fms.routing.RouteOptimizationService;
@@ -26,13 +27,16 @@ public class RouteOptimizationController {
 
   private final RouteOptimizationService optimizationService;
   private final CompanyRepository companies;
+  private final CustomerOrderRepository orders;
   private final DeliveryRouteRepository routes;
   private final RouteStopRepository stops;
 
   public RouteOptimizationController(RouteOptimizationService optimizationService,
-      CompanyRepository companies, DeliveryRouteRepository routes, RouteStopRepository stops) {
+      CompanyRepository companies, CustomerOrderRepository orders,
+      DeliveryRouteRepository routes, RouteStopRepository stops) {
     this.optimizationService = optimizationService;
     this.companies = companies;
+    this.orders = orders;
     this.routes = routes;
     this.stops = stops;
   }
@@ -49,8 +53,7 @@ public class RouteOptimizationController {
   }
 
   @GetMapping
-  public List<RouteSummaryDto> list(@PathVariable UUID companyId) {
-    if (!companies.existsById(companyId)) {
+  public List<RouteSummaryDto> list(@PathVariable UUID companyId) {    if (!companies.existsById(companyId)) {
       throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Empresa no encontrada");
     }
     return routes.findByCompanyIdOrderByDateDesc(companyId).stream()
@@ -62,5 +65,40 @@ public class RouteOptimizationController {
     String driverName = route.getDriver() == null ? "Sin asignar" : route.getDriver().getFullName();
     return new RouteSummaryDto(route.getId(), route.getDate(), driverName,
         route.getTotalKm(), stops.countByRouteId(route.getId()));
+  }
+
+  /**
+   * Reinicia un día: borra sus rutas y devuelve los pedidos asignados a pendiente,
+   * para poder re-optimizar (útil tras corregir coordenadas).
+   */
+  @PostMapping("/reset")
+  public java.util.Map<String, Object> resetDay(@PathVariable UUID companyId,
+      @RequestBody(required = false) java.util.Map<String, String> body) {
+    if (!companies.existsById(companyId)) {
+      throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Empresa no encontrada");
+    }
+    String ds = body != null ? body.get("date") : null;
+    LocalDate date = (ds != null && !ds.isBlank()) ? LocalDate.parse(ds) : LocalDate.now();
+
+    var dayRoutes = routes.findByCompanyIdAndDate(companyId, date);
+    long stopsDeleted = 0;
+    for (DeliveryRoute route : dayRoutes) {
+      var dayStops = stops.findByRouteIdOrderBySeqAsc(route.getId());
+      stopsDeleted += dayStops.size();
+      stops.deleteAll(dayStops);
+      routes.delete(route);
+    }
+
+    var assigned = orders.findByCompanyIdOrderByCreatedAtDesc(companyId).stream()
+        .filter(o -> "assigned".equals(o.getStatus()))
+        .toList();
+    assigned.forEach(o -> o.setStatus("pending"));
+    orders.saveAll(assigned);
+
+    return java.util.Map.of(
+        "date", date.toString(),
+        "routesDeleted", dayRoutes.size(),
+        "stopsDeleted", stopsDeleted,
+        "ordersReset", assigned.size());
   }
 }
