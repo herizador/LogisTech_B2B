@@ -19,12 +19,11 @@ public class OsrmClient {
   private final RestClient rest;
   private final String baseUrl;
 
-  public OsrmClient(RestClient.Builder builder,
-      @Value("${app.osrm.base-url:https://router.project-osrm.org}") String baseUrl) {
+  public OsrmClient(@Value("${app.osrm.base-url:https://router.project-osrm.org}") String baseUrl) {
     SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
     factory.setConnectTimeout(Duration.ofSeconds(5));
     factory.setReadTimeout(Duration.ofSeconds(20));
-    this.rest = builder.requestFactory(factory).build();
+    this.rest = RestClient.builder().requestFactory(factory).build();
     this.baseUrl = baseUrl;
   }
 
