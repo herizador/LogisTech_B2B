@@ -8,7 +8,9 @@ import com.logistech.fms.repository.RouteStopRepository;
 import com.logistech.fms.routing.RouteOptimizationService;
 import com.logistech.fms.web.dto.OptimizeRequest;
 import com.logistech.fms.web.dto.OptimizeResponse;
+import com.logistech.fms.web.dto.RouteDetailDto;
 import com.logistech.fms.web.dto.RouteSummaryDto;
+import com.logistech.fms.web.dto.StopDto;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
@@ -59,6 +61,24 @@ public class RouteOptimizationController {
     return routes.findByCompanyIdOrderByDateDesc(companyId).stream()
         .map(this::toSummary)
         .toList();
+  }
+
+  @GetMapping("/{routeId}")
+  public RouteDetailDto detail(@PathVariable UUID companyId, @PathVariable UUID routeId) {
+    DeliveryRoute route = routes.findById(routeId)
+        .filter(r -> r.getCompany().getId().equals(companyId))
+        .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Ruta no encontrada"));
+    String driverName = route.getDriver() == null ? "Sin asignar" : route.getDriver().getFullName();
+    List<StopDto> stopDtos = stops.findByRouteIdOrderBySeqAsc(routeId).stream()
+        .map(s -> new StopDto(s.getSeq(),
+            s.getDeliveryOrder().getId(),
+            s.getDeliveryOrder().getCustomerName(),
+            s.getDeliveryOrder().getAddress(),
+            s.getEta(),
+            s.getDeliveredAt()))
+        .toList();
+    return new RouteDetailDto(route.getId(), route.getDate().toString(), driverName,
+        route.getTotalKm(), stopDtos);
   }
 
   private RouteSummaryDto toSummary(DeliveryRoute route) {

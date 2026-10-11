@@ -135,11 +135,11 @@ public class RouteOptimizationService {
         stop.setSeq(seq);
         if (visit.getArrivalTime() != null) {
           stop.setDeliveredAt(null);
-          stopDtos.add(new StopDto(seq, order.getId(), order.getCustomerName(), order.getAddress(),
-              visit.getArrivalTime().atZone(ZoneOffset.UTC).toInstant()));
           stop.setEta(visit.getArrivalTime().atZone(ZoneOffset.UTC).toInstant());
+          stopDtos.add(new StopDto(seq, order.getId(), order.getCustomerName(), order.getAddress(),
+              stop.getEta(), null));
         } else {
-          stopDtos.add(new StopDto(seq, order.getId(), order.getCustomerName(), order.getAddress(), null));
+          stopDtos.add(new StopDto(seq, order.getId(), order.getCustomerName(), order.getAddress(), null, null));
         }
         stops.save(stop);
         order.setStatus("assigned");

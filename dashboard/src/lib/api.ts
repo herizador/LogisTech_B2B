@@ -36,20 +36,27 @@ async function get<T>(path: string): Promise<T> {
   return res.json() as Promise<T>
 }
 
-async function post<T>(path: string, body: unknown): Promise<T> {
+async function request<T>(method: string, path: string, body?: unknown): Promise<T | null> {
   const res = await fetch(`${API}${path}`, {
-    method: 'POST',
+    method,
     headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
-    body: JSON.stringify(body),
+    body: body === undefined ? undefined : JSON.stringify(body),
   })
   if (res.status === 401 || res.status === 403) {
     throw new Error(`${res.status} sin autorización (¿sesión caducada? entra de nuevo) en ${path}`)
   }
+  if (res.status === 204) return null
   if (!res.ok) {
     const text = await res.text()
     throw new Error(`${res.status} ${text || res.statusText} en ${path}`)
   }
   return res.json() as Promise<T>
+}
+
+async function post<T>(path: string, body: unknown): Promise<T> {
+  const result = await request<T>('POST', path, body)
+  if (result === null) throw new Error(`Respuesta vacía en ${path}`)
+  return result
 }
 
 export const getCompanies = () => get<Company[]>('/api/companies')
@@ -61,6 +68,7 @@ export interface RouteStopDto {
   customerName: string
   address: string
   eta: string | null
+  deliveredAt: string | null
 }
 
 export interface RouteDto {
@@ -129,3 +137,34 @@ export async function createDriver(
 export async function createOrder(companyId: string, body: NewOrder): Promise<Order> {
   return post<Order>(`/api/companies/${companyId}/orders`, body)
 }
+
+export async function updateOrderStatus(companyId: string, orderId: string, status: string): Promise<Order> {
+  const result = await request<Order>('PATCH', `/api/companies/${companyId}/orders/${orderId}`, { status })
+  if (result === null) throw new Error('Respuesta vacía al actualizar estado')
+  return result
+}
+
+export async function deleteOrder(companyId: string, orderId: string): Promise<void> {
+  await request<null>('DELETE', `/api/companies/${companyId}/orders/${orderId}`)
+}
+
+export interface RouteDetail {
+  routeId: string
+  date: string
+  driverName: string
+  totalKm: number
+  stops: Array<RouteStopDto & { deliveredAt: string | null }>
+}
+
+export const getRouteDetail = (companyId: string, routeId: string) =>
+  get<RouteDetail>(`/api/companies/${companyId}/routes/${routeId}`)
+
+export interface RouteSummary {
+  routeId: string
+  date: string
+  driverName: string
+  totalKm: number
+  stops: number
+}
+
+export const getRoutes = (companyId: string) => get<RouteSummary[]>(`/api/companies/${companyId}/routes`)

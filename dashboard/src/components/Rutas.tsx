@@ -2,7 +2,7 @@ import { Suspense, lazy, useEffect, useState } from 'react'
 import { ROUTE_COLORS, type MapPoint } from '../lib/routeStyle'
 
 const MapView = lazy(() => import('./MapView'))
-import { getCompanies, getOrders, optimizeRoutes, resetDay, type Company, type Order, type OptimizeResult } from '../lib/api'
+import { getCompanies, getOrders, getRouteDetail, getRoutes, optimizeRoutes, resetDay, updateOrderStatus, type Company, type Order, type OptimizeResult, type RouteDetail, type RouteSummary } from '../lib/api'
 
 function todayISO() {
   return new Date().toISOString().slice(0, 10)
@@ -26,6 +26,9 @@ export default function Rutas() {
   const [depotLat, setDepotLat] = useState('41.648')
   const [depotLng, setDepotLng] = useState('-0.877')
   const [result, setResult] = useState<OptimizeResult | null>(null)
+  const [history, setHistory] = useState<RouteSummary[]>([])
+  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [detail, setDetail] = useState<RouteDetail | null>(null)
   const [loading, setLoading] = useState(false)
   const [resetting, setResetting] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -43,6 +46,9 @@ export default function Rutas() {
   useEffect(() => {
     if (!companyId) return
     getOrders(companyId).then(setOrders).catch(() => undefined)
+    getRoutes(companyId).then(setHistory).catch(() => undefined)
+    setDetail(null)
+    setSelectedId(null)
   }, [companyId])
 
   async function run(e: React.FormEvent) {
@@ -59,6 +65,7 @@ export default function Rutas() {
       })
       setResult(r)
       getOrders(companyId).then(setOrders).catch(() => undefined)
+      getRoutes(companyId).then(setHistory).catch(() => undefined)
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
     } finally {
@@ -66,8 +73,7 @@ export default function Rutas() {
     }
   }
 
-  async function reset(e: React.FormEvent) {
-    e.preventDefault()
+  async function reset(e: React.FormEvent) {    e.preventDefault()
     setResetting(true)
     setError(null)
     setInfo(null)
@@ -80,6 +86,25 @@ export default function Rutas() {
       setError(err instanceof Error ? err.message : String(err))
     } finally {
       setResetting(false)
+    }
+  }
+
+  async function openDetail(routeId: string) {
+    setSelectedId(routeId)
+    try {
+      setDetail(await getRouteDetail(companyId, routeId))
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+    }
+  }
+
+  async function deliverStop(orderId: string) {
+    try {
+      await updateOrderStatus(companyId, orderId, 'delivered')
+      if (selectedId) setDetail(await getRouteDetail(companyId, selectedId))
+      getOrders(companyId).then(setOrders).catch(() => undefined)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
     }
   }
 
@@ -209,6 +234,47 @@ export default function Rutas() {
                   </ul>
                 </div>
               )}
+            </div>
+          )}
+        </div>
+        <div className="bg-white rounded-xl shadow p-4">
+          <h2 className="font-semibold mb-2">Rutas guardadas ({history.length})</h2>
+          {history.length === 0 && <p className="text-sm text-slate-500">Todavía no hay rutas guardadas.</p>}
+          <ul className="space-y-2 text-sm">
+            {history.map((h) => (
+              <li key={h.routeId}>
+                <button
+                  className={`border rounded p-2 w-full text-left hover:bg-slate-50 ${selectedId === h.routeId ? 'ring-2 ring-slate-400' : ''}`}
+                  onClick={() => openDetail(h.routeId)}
+                >
+                  <p className="font-medium">{h.date} · {h.driverName}</p>
+                  <p className="text-xs text-slate-400">{h.stops} paradas · {h.totalKm.toFixed(1)} km</p>
+                </button>
+              </li>
+            ))}
+          </ul>
+          {detail && (
+            <div className="mt-3 border-t pt-3 text-sm">
+              <p className="font-medium mb-1">
+                {detail.date} · {detail.driverName} · {detail.totalKm.toFixed(1)} km
+              </p>
+              <ol className="list-decimal ml-5 space-y-1">
+                {detail.stops.map((s) => (
+                  <li key={s.orderId}>
+                    {s.customerName} <span className="text-slate-400">ETA {formatETA(s.eta)}</span>{' '}
+                    {s.deliveredAt ? (
+                      <span className="text-xs text-green-700">entregada ✓</span>
+                    ) : (
+                      <button
+                        className="text-xs text-green-700 hover:underline"
+                        onClick={() => deliverStop(s.orderId)}
+                      >
+                        marcar entregada
+                      </button>
+                    )}
+                  </li>
+                ))}
+              </ol>
             </div>
           )}
         </div>

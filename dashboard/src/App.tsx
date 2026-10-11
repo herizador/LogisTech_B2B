@@ -5,7 +5,7 @@ import Rutas from './components/Rutas'
 import Conductores from './components/Conductores'
 import Login from './components/Login'
 import { useAuth } from './lib/auth'
-import { API_BASE, getCompanies, getOrders, type Company, type Order } from './lib/api'
+import { API_BASE, deleteOrder, getCompanies, getOrders, updateOrderStatus, type Company, type Order } from './lib/api'
 
 const MapView = lazy(() => import('./components/MapView'))
 
@@ -70,6 +70,25 @@ function Dashboard() {
     getOrders(id).then(setOrders).catch((e) => setError(`Error cargando pedidos: ${e.message}`))
   }
 
+  async function deliver(orderId: string) {
+    try {
+      await updateOrderStatus(companyId, orderId, 'delivered')
+      loadOrders(companyId)
+    } catch (e) {
+      setError(`Error marcando entrega: ${e instanceof Error ? e.message : e}`)
+    }
+  }
+
+  async function remove(orderId: string, name: string) {
+    if (!window.confirm(`¿Borrar el pedido de ${name}?`)) return
+    try {
+      await deleteOrder(companyId, orderId)
+      loadOrders(companyId)
+    } catch (e) {
+      setError(`Error borrando: ${e instanceof Error ? e.message : e}`)
+    }
+  }
+
   useEffect(() => {
     if (!companyId) return
     loadOrders(companyId)
@@ -111,14 +130,33 @@ function Dashboard() {
         <ul className="space-y-2 text-sm">
           {orders.map((o) => (
             <li key={o.id} className="border rounded p-2">
-              <p className="font-medium">{o.customerName}</p>
+              <div className="flex items-center justify-between">
+                <p className="font-medium">{o.customerName}</p>
+                <span className={`text-xs px-1.5 py-0.5 rounded ${
+                  o.status === 'delivered' ? 'bg-green-100 text-green-700'
+                  : o.status === 'assigned' ? 'bg-blue-100 text-blue-700'
+                  : 'bg-slate-100 text-slate-500'}`}
+                >
+                  {o.status}
+                </span>
+              </div>
               <p className="text-slate-500">{o.address}</p>
               <p className="text-xs text-slate-400">
                 {o.lat != null && o.lng != null
                   ? `${o.lat.toFixed(5)}, ${o.lng.toFixed(5)}`
                   : 'sin coordenadas'}
+                {o.weightKg != null ? ` · ${o.weightKg} kg` : ''}
               </p>
-              <p className="text-xs text-slate-400">{o.status}{o.weightKg != null ? ` · ${o.weightKg} kg` : ''}</p>
+              <div className="flex gap-2 mt-1">
+                {o.status !== 'delivered' && (
+                  <button className="text-xs text-green-700 hover:underline" onClick={() => deliver(o.id)}>
+                    Marcar entregada
+                  </button>
+                )}
+                <button className="text-xs text-red-600 hover:underline" onClick={() => remove(o.id, o.customerName)}>
+                  Borrar
+                </button>
+              </div>
             </li>
           ))}
         </ul>
