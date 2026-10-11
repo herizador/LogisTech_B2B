@@ -1,5 +1,7 @@
-import { useEffect, useState } from 'react'
-import MapView, { ROUTE_COLORS, type MapPoint } from './MapView'
+import { Suspense, lazy, useEffect, useState } from 'react'
+import { ROUTE_COLORS, type MapPoint } from '../lib/routeStyle'
+
+const MapView = lazy(() => import('./MapView'))
 import { getCompanies, getOrders, optimizeRoutes, resetDay, type Company, type Order, type OptimizeResult } from '../lib/api'
 
 function todayISO() {
@@ -153,7 +155,9 @@ export default function Rutas() {
       </form>
 
       <div className="lg:col-span-2 space-y-6">
-        <MapView points={background} routes={lines} />
+        <Suspense fallback={<p className="text-sm">Cargando mapa…</p>}>
+          <MapView points={background} routes={lines} />
+        </Suspense>
         <div className="bg-white rounded-xl shadow p-4">
           <h2 className="font-semibold mb-2">Resultado</h2>
           {!result && !loading && (

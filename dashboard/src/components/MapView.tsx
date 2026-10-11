@@ -1,21 +1,14 @@
 import { useEffect, useRef } from 'react'
-import { Map, Marker, LngLatBounds } from 'maplibre-gl'
+import { Map, Marker, LngLatBounds, setWorkerUrl } from 'maplibre-gl'
+import type { MapPoint, RouteLine } from '../lib/routeStyle'
+// El worker se empaqueta versionado y se registra aquí (este módulo carga en lazy,
+// así el mapa no engorda el bundle inicial). Sin esto, MapLibre lo busca en
+// /assets/... donde no existe y Vercel devuelve index.html (error MIME).
+import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url'
 
-export interface MapPoint {
-  lat: number
-  lng: number
-  label: string
-  seq?: number
-}
-
-export interface RouteLine {
-  points: MapPoint[]
-  color: string
-  markers?: MapPoint[]
-}
+setWorkerUrl(workerUrl)
 
 const STYLE = 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json'
-export const ROUTE_COLORS = ['#1d4ed8', '#dc2626', '#059669', '#d97706', '#7c3aed']
 
 function numberedEl(seq: number, color: string): HTMLDivElement {
   const el = document.createElement('div')

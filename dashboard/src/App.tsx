@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react'
+import { Suspense, lazy, useEffect, useState } from 'react'
 import { Routes, Route, Link } from 'react-router-dom'
-import MapView from './components/MapView'
 import OrderForm from './components/OrderForm'
 import Rutas from './components/Rutas'
 import { API_BASE, getCompanies, getOrders, type Company, type Order } from './lib/api'
+
+const MapView = lazy(() => import('./components/MapView'))
 
 function Layout({ children }: { children: React.ReactNode }) {
   return (
@@ -70,7 +71,13 @@ function Dashboard() {
           </select>
         </div>
         {error && <p className="text-sm text-red-600 mb-2">{error}</p>}
-        {loading ? <p className="text-sm">Cargando…</p> : <MapView points={points} />}
+        {loading ? (
+          <p className="text-sm">Cargando…</p>
+        ) : (
+          <Suspense fallback={<p className="text-sm">Cargando mapa…</p>}>
+            <MapView points={points} />
+          </Suspense>
+        )}
       </div>
       <div className="bg-white rounded-xl shadow p-4">
         <h2 className="font-semibold mb-2">Pedidos ({orders.length})</h2>

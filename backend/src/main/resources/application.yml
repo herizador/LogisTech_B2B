@@ -33,7 +33,7 @@ management:
 timefold:
   solver:
     termination:
-      spent-limit: 30s
+      spent-limit: ${SOLVER_SPENT_LIMIT:10s}
 
 app:
   osrm:

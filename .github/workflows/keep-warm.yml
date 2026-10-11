@@ -1,0 +1,15 @@
+name: Mantener backend despierto
+
+# El plan gratuito de Render duerme el servicio tras ~15 min sin tráfico
+# y el arranque en frío retrasa la primera petición. Este ping cada 10 min
+# lo mantiene despierto (un servicio 24/7 consume ~720h/mes del límite de 750h).
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - run: curl -fsS -m 30 https://logistech-b2b.onrender.com/api/health
