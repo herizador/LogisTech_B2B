@@ -21,6 +21,9 @@ public class SecurityConfig {
   @Bean
   public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
     http.csrf(AbstractHttpConfigurer::disable)
+        // Sin esto, Spring Security rechaza los preflight OPTIONS antes de que
+        // se aplique la configuración CORS de MVC (CorsConfig) -> el navegador bloquea.
+        .cors(Customizer.withDefaults())
         .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
         .authorizeHttpRequests(auth -> auth
             .requestMatchers("/", "/api/health", "/actuator/health").permitAll()
