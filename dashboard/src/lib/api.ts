@@ -103,6 +103,30 @@ export interface NewOrder {
   weightKg?: number
 }
 
+export interface Driver {
+  id: string
+  fullName: string
+  vehicleCapacityKg: number | null
+}
+
+export const getDrivers = (companyId: string) => get<Driver[]>(`/api/companies/${companyId}/drivers`)
+
+export async function createDriver(
+  companyId: string,
+  body: { fullName: string; vehicleCapacityKg?: number },
+): Promise<Driver> {
+  const res = await fetch(`${API}/api/companies/${companyId}/drivers`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  if (!res.ok) {
+    const text = await res.text()
+    throw new Error(`${res.status} ${text || res.statusText}`)
+  }
+  return res.json() as Promise<Driver>
+}
+
 export async function createOrder(companyId: string, body: NewOrder): Promise<Order> {
   const res = await fetch(`${API}/api/companies/${companyId}/orders`, {
     method: 'POST',

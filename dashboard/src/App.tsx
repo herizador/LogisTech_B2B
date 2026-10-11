@@ -2,6 +2,7 @@ import { Suspense, lazy, useEffect, useState } from 'react'
 import { Routes, Route, Link } from 'react-router-dom'
 import OrderForm from './components/OrderForm'
 import Rutas from './components/Rutas'
+import Conductores from './components/Conductores'
 import { API_BASE, getCompanies, getOrders, type Company, type Order } from './lib/api'
 
 const MapView = lazy(() => import('./components/MapView'))
@@ -14,6 +15,7 @@ function Layout({ children }: { children: React.ReactNode }) {
         <nav className="flex gap-4 text-sm">
           <Link to="/" className="hover:underline">Flota</Link>
           <Link to="/rutas" className="hover:underline">Rutas</Link>
+          <Link to="/conductores" className="hover:underline">Conductores</Link>
           <Link to="/health" className="hover:underline">API Status</Link>
         </nav>
       </header>
@@ -114,6 +116,7 @@ export default function App() {
       <Routes>
         <Route path="/" element={<Dashboard />} />
         <Route path="/rutas" element={<Rutas />} />
+        <Route path="/conductores" element={<Conductores />} />
         <Route path="/health" element={<Health />} />
       </Routes>
     </Layout>
