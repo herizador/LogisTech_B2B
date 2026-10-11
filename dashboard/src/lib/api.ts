@@ -2,6 +2,13 @@ const API = (import.meta.env.VITE_API_URL as string | undefined) ?? 'http://loca
 
 export const API_BASE = API
 
+async function authHeaders(): Promise<Record<string, string>> {
+  const { supabase } = await import('./supabase')
+  const { data } = await supabase.auth.getSession()
+  const token = data.session?.access_token
+  return token ? { Authorization: `Bearer ${token}` } : {}
+}
+
 export interface Company {
   id: string
   name: string
@@ -21,8 +28,27 @@ export interface Order {
 }
 
 async function get<T>(path: string): Promise<T> {
-  const res = await fetch(`${API}${path}`)
+  const res = await fetch(`${API}${path}`, { headers: await authHeaders() })
+  if (res.status === 401 || res.status === 403) {
+    throw new Error(`${res.status} sin autorización (¿sesión caducada? entra de nuevo) en ${path}`)
+  }
   if (!res.ok) throw new Error(`${res.status} ${res.statusText} en ${path}`)
+  return res.json() as Promise<T>
+}
+
+async function post<T>(path: string, body: unknown): Promise<T> {
+  const res = await fetch(`${API}${path}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
+    body: JSON.stringify(body),
+  })
+  if (res.status === 401 || res.status === 403) {
+    throw new Error(`${res.status} sin autorización (¿sesión caducada? entra de nuevo) en ${path}`)
+  }
+  if (!res.ok) {
+    const text = await res.text()
+    throw new Error(`${res.status} ${text || res.statusText} en ${path}`)
+  }
   return res.json() as Promise<T>
 }
 
@@ -68,31 +94,13 @@ export interface ResetDayResult {
 }
 
 export async function resetDay(companyId: string, date?: string): Promise<ResetDayResult> {
-  const res = await fetch(`${API}/api/companies/${companyId}/routes/reset`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ date }),
-  })
-  if (!res.ok) {
-    const text = await res.text()
-    throw new Error(`${res.status} ${text || res.statusText}`)
-  }
-  return res.json() as Promise<ResetDayResult>
+  return post<ResetDayResult>(`/api/companies/${companyId}/routes/reset`, { date })
 }
 
 export async function optimizeRoutes(  companyId: string,
   body: { date?: string; depotLat?: number; depotLng?: number },
 ): Promise<OptimizeResult> {
-  const res = await fetch(`${API}/api/companies/${companyId}/routes/optimize`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  })
-  if (!res.ok) {
-    const text = await res.text()
-    throw new Error(`${res.status} ${text || res.statusText}`)
-  }
-  return res.json() as Promise<OptimizeResult>
+  return post<OptimizeResult>(`/api/companies/${companyId}/routes/optimize`, body)
 }
 
 export interface NewOrder {
@@ -115,27 +123,9 @@ export async function createDriver(
   companyId: string,
   body: { fullName: string; vehicleCapacityKg?: number },
 ): Promise<Driver> {
-  const res = await fetch(`${API}/api/companies/${companyId}/drivers`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  })
-  if (!res.ok) {
-    const text = await res.text()
-    throw new Error(`${res.status} ${text || res.statusText}`)
-  }
-  return res.json() as Promise<Driver>
+  return post<Driver>(`/api/companies/${companyId}/drivers`, body)
 }
 
 export async function createOrder(companyId: string, body: NewOrder): Promise<Order> {
-  const res = await fetch(`${API}/api/companies/${companyId}/orders`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  })
-  if (!res.ok) {
-    const text = await res.text()
-    throw new Error(`${res.status} ${text || res.statusText} en POST /api/companies/${companyId}/orders`)
-  }
-  return res.json() as Promise<Order>
+  return post<Order>(`/api/companies/${companyId}/orders`, body)
 }

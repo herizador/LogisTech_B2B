@@ -1,22 +1,44 @@
 import { Suspense, lazy, useEffect, useState } from 'react'
-import { Routes, Route, Link } from 'react-router-dom'
+import { Routes, Route, Link, Navigate, useNavigate } from 'react-router-dom'
 import OrderForm from './components/OrderForm'
 import Rutas from './components/Rutas'
 import Conductores from './components/Conductores'
+import Login from './components/Login'
+import { useAuth } from './lib/auth'
 import { API_BASE, getCompanies, getOrders, type Company, type Order } from './lib/api'
 
 const MapView = lazy(() => import('./components/MapView'))
 
+function RequireAuth({ children }: { children: React.ReactNode }) {
+  const { user, loading } = useAuth()
+  if (loading) return <p className="p-6 text-sm">Cargando sesión…</p>
+  if (!user) return <Navigate to="/login" replace />
+  return <>{children}</>
+}
+
 function Layout({ children }: { children: React.ReactNode }) {
+  const { user, signOut } = useAuth()
+  const navigate = useNavigate()
   return (
     <div className="min-h-screen bg-slate-100 text-slate-900">
       <header className="bg-slate-900 text-white px-6 py-3 flex items-center justify-between">
         <Link to="/" className="font-bold text-lg">LogisTech B2B</Link>
-        <nav className="flex gap-4 text-sm">
+        <nav className="flex gap-4 text-sm items-center">
           <Link to="/" className="hover:underline">Flota</Link>
           <Link to="/rutas" className="hover:underline">Rutas</Link>
           <Link to="/conductores" className="hover:underline">Conductores</Link>
           <Link to="/health" className="hover:underline">API Status</Link>
+          {user && (
+            <>
+              <span className="text-slate-300 text-xs">{user.email}</span>
+              <button
+                className="hover:underline text-xs"
+                onClick={() => signOut().then(() => navigate('/login'))}
+              >
+                Salir
+              </button>
+            </>
+          )}
         </nav>
       </header>
       <main className="p-6">{children}</main>
@@ -114,9 +136,10 @@ export default function App() {
   return (
     <Layout>
       <Routes>
-        <Route path="/" element={<Dashboard />} />
-        <Route path="/rutas" element={<Rutas />} />
-        <Route path="/conductores" element={<Conductores />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/" element={<RequireAuth><Dashboard /></RequireAuth>} />
+        <Route path="/rutas" element={<RequireAuth><Rutas /></RequireAuth>} />
+        <Route path="/conductores" element={<RequireAuth><Conductores /></RequireAuth>} />
         <Route path="/health" element={<Health />} />
       </Routes>
     </Layout>
