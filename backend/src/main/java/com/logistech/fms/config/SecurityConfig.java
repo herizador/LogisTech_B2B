@@ -7,6 +7,7 @@ import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.oauth2.jose.jws.SignatureAlgorithm;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtValidators;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
@@ -41,6 +42,8 @@ public class SecurityConfig {
   public JwtDecoder jwtDecoder() {
     NimbusJwtDecoder decoder = NimbusJwtDecoder
         .withJwkSetUri(supabaseUrl + "/auth/v1/.well-known/jwks.json")
+        // Supabase firma con ES256; por defecto Spring espera RS256 y rechaza el token.
+        .jwsAlgorithm(SignatureAlgorithm.ES256)
         .build();
     decoder.setJwtValidator(JwtValidators.createDefaultWithIssuer(supabaseUrl + "/auth/v1"));
     return decoder;
