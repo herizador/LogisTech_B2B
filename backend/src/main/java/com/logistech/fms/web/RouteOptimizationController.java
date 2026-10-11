@@ -1,5 +1,6 @@
 package com.logistech.fms.web;
 
+import com.logistech.fms.albaran.DeliveryNotePdf;
 import com.logistech.fms.domain.DeliveryRoute;
 import com.logistech.fms.repository.CompanyRepository;
 import com.logistech.fms.repository.CustomerOrderRepository;
@@ -10,11 +11,16 @@ import com.logistech.fms.web.dto.OptimizeRequest;
 import com.logistech.fms.web.dto.OptimizeResponse;
 import com.logistech.fms.web.dto.RouteDetailDto;
 import com.logistech.fms.web.dto.RouteSummaryDto;
+import com.logistech.fms.web.dto.RouteVerifyDto;
 import com.logistech.fms.web.dto.StopDto;
 import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.UUID;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -33,6 +39,9 @@ public class RouteOptimizationController {
   private final CustomerOrderRepository orders;
   private final DeliveryRouteRepository routes;
   private final RouteStopRepository stops;
+
+  @Value("${app.public-base-url:https://logistech-b2b.onrender.com}")
+  private String publicBaseUrl;
 
   public RouteOptimizationController(RouteOptimizationService optimizationService,
       CompanyRepository companies, CustomerOrderRepository orders,
@@ -82,6 +91,47 @@ public class RouteOptimizationController {
         .toList();
     return new RouteDetailDto(route.getId(), route.getDate().toString(), driverName,
         route.getTotalKm(), stopDtos);
+  }
+
+  /** Datos públicos mínimos para verificar un albarán escaneando su QR (sin login). */
+  @GetMapping("/verify/{routeId}")
+  public RouteVerifyDto verify(@PathVariable UUID routeId) {
+    DeliveryRoute route = routes.findById(routeId)
+        .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Ruta no encontrada"));
+    var routeStops = stops.findByRouteIdOrderBySeqAsc(routeId);
+    long delivered = routeStops.stream().filter(s -> s.getDeliveredAt() != null).count();
+    String driverName = route.getDriver() == null ? "Sin asignar" : route.getDriver().getFullName();
+    return new RouteVerifyDto(route.getId(), route.getCompany().getName(),
+        route.getDate().toString(), driverName, route.getTotalKm(),
+        routeStops.size(), (int) delivered);
+  }
+
+  /** Descarga el albarán PDF de una ruta (requiere login). */
+  @GetMapping(value = "/{routeId}/albaran.pdf", produces = MediaType.APPLICATION_PDF_VALUE)
+  @Transactional(readOnly = true)
+  public ResponseEntity<byte[]> albaran(@PathVariable UUID companyId, @PathVariable UUID routeId) {
+    DeliveryRoute route = routes.findById(routeId)
+        .filter(r -> r.getCompany().getId().equals(companyId))
+        .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Ruta no encontrada"));
+    DateTimeFormatter time = DateTimeFormatter.ofPattern("HH:mm");
+    List<DeliveryNotePdf.StopLine> lines = stops.findByRouteIdOrderBySeqAsc(routeId).stream()
+        .map(s -> new DeliveryNotePdf.StopLine(s.getSeq(),
+            s.getDeliveryOrder().getCustomerName(),
+            s.getDeliveryOrder().getAddress(),
+            s.getEta() == null ? "-" : s.getEta().atZone(java.time.ZoneOffset.UTC).format(time),
+            s.getDeliveredAt() != null))
+        .toList();
+    String driverName = route.getDriver() == null ? "Sin asignar" : route.getDriver().getFullName();
+    var doc = new DeliveryNotePdf.RouteDoc(route.getCompany().getName(),
+        route.getDate().toString(), driverName,
+        route.getTotalKm() == null ? "-" : route.getTotalKm().toString(),
+        lines, publicBaseUrl + "/api/companies/" + companyId + "/routes/verify/" + routeId);
+    byte[] pdf = DeliveryNotePdf.generate(doc);
+    return ResponseEntity.ok()
+        .header("Content-Disposition",
+            "attachment; filename=\"albaran-" + routeId.toString().substring(0, 8) + ".pdf\"")
+        .contentType(MediaType.APPLICATION_PDF)
+        .body(pdf);
   }
 
   private RouteSummaryDto toSummary(DeliveryRoute route) {

@@ -3,6 +3,7 @@ package com.logistech.fms.config;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
@@ -28,6 +29,7 @@ public class SecurityConfig {
         .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
         .authorizeHttpRequests(auth -> auth
             .requestMatchers("/", "/api/health", "/api/debug/**", "/actuator/health").permitAll()
+            .requestMatchers(HttpMethod.GET, "/api/companies/*/routes/verify/*").permitAll()
             .requestMatchers("/api/**").authenticated()
             .anyRequest().permitAll())
         .oauth2ResourceServer(oauth2 -> oauth2.jwt(Customizer.withDefaults()));

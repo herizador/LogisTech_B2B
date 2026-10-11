@@ -2,7 +2,7 @@ import { Suspense, lazy, useEffect, useState } from 'react'
 import { ROUTE_COLORS, type MapPoint } from '../lib/routeStyle'
 
 const MapView = lazy(() => import('./MapView'))
-import { getCompanies, getOrders, getRouteDetail, getRoutes, optimizeRoutes, resetDay, updateOrderStatus, type Company, type Order, type OptimizeResult, type RouteDetail, type RouteSummary } from '../lib/api'
+import { getCompanies, getOrders, getRouteDetail, getRoutes, optimizeRoutes, resetDay, updateOrderStatus, downloadAlbaran, type Company, type Order, type OptimizeResult, type RouteDetail, type RouteSummary } from '../lib/api'
 
 function todayISO() {
   return new Date().toISOString().slice(0, 10)
@@ -114,6 +114,14 @@ export default function Rutas() {
     }
   }
 
+  async function download(routeId: string) {
+    try {
+      await downloadAlbaran(companyId, routeId)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+    }
+  }
+
   const orderById = new Map(orders.map((o) => [o.id, o]))
   const background: MapPoint[] = orders
     .filter((o) => o.lat != null && o.lng != null)
@@ -219,7 +227,13 @@ export default function Rutas() {
                       className="inline-block w-3 h-3 rounded-full mr-1"
                       style={{ background: ROUTE_COLORS[i % ROUTE_COLORS.length] }}
                     />
-                    {r.driverName} · {r.totalKm.toFixed(1)} km · {r.drivingMinutes} min
+                    {r.driverName} · {r.totalKm.toFixed(1)} km · {r.drivingMinutes} min{' '}
+                    <button
+                      className="text-xs text-slate-600 hover:underline ml-1"
+                      onClick={() => download(r.routeId)}
+                    >
+                      PDF
+                    </button>
                   </p>
                   <ol className="list-decimal ml-5 mt-1 space-y-1">
                     {r.stops.map((s) => (
@@ -262,7 +276,13 @@ export default function Rutas() {
           {detail && (
             <div className="mt-3 border-t pt-3 text-sm">
               <p className="font-medium mb-1">
-                {detail.date} · {detail.driverName} · {detail.totalKm.toFixed(1)} km
+                {detail.date} · {detail.driverName} · {detail.totalKm.toFixed(1)} km{' '}
+                <button
+                  className="text-xs text-slate-600 hover:underline ml-1"
+                  onClick={() => download(detail.routeId)}
+                >
+                  PDF
+                </button>
               </p>
               <ol className="list-decimal ml-5 space-y-1">
                 {detail.stops.map((s) => (

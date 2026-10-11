@@ -40,6 +40,7 @@ app:
     allowed-origins: ${APP_CORS_ALLOWED_ORIGINS:http://localhost:5173}
   supabase:
     url: ${SUPABASE_URL:https://npswaigxcmyddqwdktge.supabase.co}
+  public-base-url: ${PUBLIC_BASE_URL:https://logistech-b2b.onrender.com}
   osrm:
     base-url: ${OSRM_BASE_URL:https://router.project-osrm.org}
 

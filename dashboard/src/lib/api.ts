@@ -159,6 +159,25 @@ export interface RouteDetail {
 export const getRouteDetail = (companyId: string, routeId: string) =>
   get<RouteDetail>(`/api/companies/${companyId}/routes/${routeId}`)
 
+export async function downloadAlbaran(companyId: string, routeId: string): Promise<void> {
+  const res = await fetch(`${API}/api/companies/${companyId}/routes/${routeId}/albaran.pdf`, {
+    headers: await authHeaders(),
+  })
+  if (!res.ok) {
+    const text = await res.text()
+    throw new Error(`${res.status} ${text || res.statusText}`)
+  }
+  const blob = await res.blob()
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `albaran-${routeId.slice(0, 8)}.pdf`
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  URL.revokeObjectURL(url)
+}
+
 export interface RouteSummary {
   routeId: string
   date: string
