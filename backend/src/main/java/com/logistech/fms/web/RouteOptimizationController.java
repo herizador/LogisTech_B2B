@@ -27,6 +27,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -82,15 +83,32 @@ public class RouteOptimizationController {
         .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Ruta no encontrada"));
     String driverName = route.getDriver() == null ? "Sin asignar" : route.getDriver().getFullName();
     List<StopDto> stopDtos = stops.findByRouteIdOrderBySeqAsc(routeId).stream()
-        .map(s -> new StopDto(s.getSeq(),
-            s.getDeliveryOrder().getId(),
-            s.getDeliveryOrder().getCustomerName(),
-            s.getDeliveryOrder().getAddress(),
-            s.getEta(),
-            s.getDeliveredAt()))
+        .map(s -> {
+          var loc = s.getDeliveryOrder().getLocation();
+          return new StopDto(s.getSeq(),
+              s.getDeliveryOrder().getId(),
+              s.getDeliveryOrder().getCustomerName(),
+              s.getDeliveryOrder().getAddress(),
+              loc == null ? null : loc.getY(),
+              loc == null ? null : loc.getX(),
+              s.getEta(),
+              s.getDeliveredAt());
+        })
         .toList();
     return new RouteDetailDto(route.getId(), route.getDate().toString(), driverName,
         route.getTotalKm(), stopDtos);
+  }
+
+  /** Rutas de un conductor en una fecha (para la PWA del repartidor). */
+  @GetMapping("/drivers/{driverId}/routes")
+  @Transactional(readOnly = true)
+  public List<RouteDetailDto> byDriver(@PathVariable UUID companyId, @PathVariable UUID driverId,
+      @RequestParam(required = false) String date) {
+    LocalDate day = (date != null && !date.isBlank()) ? LocalDate.parse(date) : LocalDate.now();
+    return routes.findByCompanyIdAndDate(companyId, day).stream()
+        .filter(r -> r.getDriver() != null && r.getDriver().getId().equals(driverId))
+        .map(r -> detail(companyId, r.getId()))
+        .toList();
   }
 
   /** Datos públicos mínimos para verificar un albarán escaneando su QR (sin login). */

@@ -8,6 +8,8 @@ public record StopDto(
     UUID orderId,
     String customerName,
     String address,
+    Double lat,
+    Double lng,
     Instant eta,
     Instant deliveredAt) {
 }

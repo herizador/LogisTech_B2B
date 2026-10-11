@@ -129,6 +129,8 @@ public class RouteOptimizationService {
       int seq = 1;
       for (DeliveryVisit visit : vehicle.getVisits()) {
         CustomerOrder order = ordersById.get(visit.getOrderId());
+        Double lat = order.getLocation() == null ? null : order.getLocation().getY();
+        Double lng = order.getLocation() == null ? null : order.getLocation().getX();
         RouteStop stop = new RouteStop();
         stop.setRoute(route);
         stop.setDeliveryOrder(order);
@@ -137,9 +139,10 @@ public class RouteOptimizationService {
           stop.setDeliveredAt(null);
           stop.setEta(visit.getArrivalTime().atZone(ZoneOffset.UTC).toInstant());
           stopDtos.add(new StopDto(seq, order.getId(), order.getCustomerName(), order.getAddress(),
-              stop.getEta(), null));
+              lat, lng, stop.getEta(), null));
         } else {
-          stopDtos.add(new StopDto(seq, order.getId(), order.getCustomerName(), order.getAddress(), null, null));
+          stopDtos.add(new StopDto(seq, order.getId(), order.getCustomerName(), order.getAddress(),
+              lat, lng, null, null));
         }
         stops.save(stop);
         order.setStatus("assigned");
