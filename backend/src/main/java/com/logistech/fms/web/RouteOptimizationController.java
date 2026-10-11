@@ -95,8 +95,10 @@ public class RouteOptimizationController {
 
   /** Datos públicos mínimos para verificar un albarán escaneando su QR (sin login). */
   @GetMapping("/verify/{routeId}")
-  public RouteVerifyDto verify(@PathVariable UUID routeId) {
+  @Transactional(readOnly = true)
+  public RouteVerifyDto verify(@PathVariable UUID companyId, @PathVariable UUID routeId) {
     DeliveryRoute route = routes.findById(routeId)
+        .filter(r -> r.getCompany().getId().equals(companyId))
         .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Ruta no encontrada"));
     var routeStops = stops.findByRouteIdOrderBySeqAsc(routeId);
     long delivered = routeStops.stream().filter(s -> s.getDeliveredAt() != null).count();
