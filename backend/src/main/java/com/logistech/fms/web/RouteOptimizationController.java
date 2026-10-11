@@ -15,6 +15,7 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -55,6 +56,7 @@ public class RouteOptimizationController {
   }
 
   @GetMapping
+  @Transactional(readOnly = true)
   public List<RouteSummaryDto> list(@PathVariable UUID companyId) {    if (!companies.existsById(companyId)) {
       throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Empresa no encontrada");
     }
@@ -64,6 +66,7 @@ public class RouteOptimizationController {
   }
 
   @GetMapping("/{routeId}")
+  @Transactional(readOnly = true)
   public RouteDetailDto detail(@PathVariable UUID companyId, @PathVariable UUID routeId) {
     DeliveryRoute route = routes.findById(routeId)
         .filter(r -> r.getCompany().getId().equals(companyId))
