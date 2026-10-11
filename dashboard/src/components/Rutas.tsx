@@ -81,7 +81,10 @@ export default function Rutas() {
     try {
       const r = await resetDay(companyId, date)
       setInfo(`Día ${r.date} reiniciado: ${r.routesDeleted} ruta(s) borradas, ${r.ordersReset} pedido(s) a pendiente.`)
+      setDetail(null)
+      setSelectedId(null)
       getOrders(companyId).then(setOrders).catch(() => undefined)
+      getRoutes(companyId).then(setHistory).catch(() => undefined)
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
     } finally {
@@ -94,7 +97,10 @@ export default function Rutas() {
     try {
       setDetail(await getRouteDetail(companyId, routeId))
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err))
+      setDetail(null)
+      setSelectedId(null)
+      setError(`Esa ruta ya no existe (¿reiniciaste el día?). ${err instanceof Error ? err.message : err}`)
+      getRoutes(companyId).then(setHistory).catch(() => undefined)
     }
   }
 
