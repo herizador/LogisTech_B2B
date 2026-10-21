@@ -2,8 +2,8 @@ name: Mantener backend despierto
 
 # El plan gratuito de Render duerme el servicio tras ~15 min sin tráfico y el
 # arranque en frío de Spring Boot puede tardar varios minutos. Por eso el ping
-# espera hasta 4 min y reintenta una vez: con `-m 30` fallaba casi siempre y
-# GitHub enviaba un correo por cada intento fallido.
+# reintenta durante varios minutos: con `-m 30` fallaba casi siempre y GitHub
+# enviaba un correo por cada intento fallido.
 on:
   schedule:
     - cron: "*/10 * * * *"
@@ -20,18 +20,24 @@ permissions:
 jobs:
   ping:
     runs-on: ubuntu-latest
-    timeout-minutes: 9
+    timeout-minutes: 12
     steps:
       - name: Despertar y comprobar el backend
         run: |
           set -euo pipefail
           URL="https://logistech-b2b.onrender.com/api/health"
           echo "Ping a $URL"
-          curl -fsS \
-            --connect-timeout 20 \
-            --max-time 240 \
-            --retry 1 \
-            --retry-delay 10 \
-            --retry-all-errors \
-            -w "\nOK: HTTP %{http_code} en %{time_total}s\n" \
-            "$URL"
+
+          # Render puede tardar varios minutos en arrancar. Reintentamos hasta
+          # ~10 minutos antes de dar el backend por caído.
+          for intento in 1 2 3 4 5 6; do
+            if curl -fsS --connect-timeout 15 --max-time 90 \
+                 -w "\nOK: HTTP %{http_code} en %{time_total}s\n" "$URL"; then
+              exit 0
+            fi
+            echo "Intento $intento fallido; el backend puede estar arrancando. Espero 15 s..."
+            sleep 15
+          done
+
+          echo "El backend no respondió tras 6 intentos."
+          exit 1
